@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.math.roundToInt
 
 private enum class Screen(val title: String) { TUNER("Afinador"), TONES("Tonos"), METRO("Metrónomo"), SETTINGS("Ajustes") }
@@ -72,12 +73,15 @@ private fun GuitarProApp(activity: MainActivity, hasMicPermission: Boolean) {
     var metronomeOn by remember { mutableStateOf(false) }
     var selectedTone by remember { mutableStateOf("A4") }
     val catalog = remember { TuningCatalog.all }
+    val pitchStabilizer = remember { PitchStabilizer() }
     val currentTunings = catalog.filter { it.instrument == instrument }
     val selectedTuning = currentTunings.firstOrNull { it.name == tuningName } ?: currentTunings.first()
     val toneNames = listOf("C3", "D3", "E3", "F3", "G3", "A3", "B3", "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5")
 
     LaunchedEffect(listening, hasMicPermission, a4) {
         if (!listening || !hasMicPermission) return@LaunchedEffect
+        pitchStabilizer.reset()
+        pitch = null
         withContext(Dispatchers.IO) {
             val rate = 44100
             val minBytes = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -89,11 +93,19 @@ private fun GuitarProApp(activity: MainActivity, hasMicPermission: Boolean) {
             try {
                 recorder.startRecording()
                 val buffer = ShortArray(8192)
+                var missedFrames = 0
                 while (isActive && listening) {
                     val count = recorder.read(buffer, 0, buffer.size)
-                    if (count > 0) {
-                        val result = TunerEngine.detect(buffer.copyOf(count), rate, a4.toDouble())
-                        withContext(Dispatchers.Main) { if (result != null) pitch = result }
+                    if (count >= 4096) {
+                        val raw = TunerEngine.detect(buffer.copyOf(count), rate, a4.toDouble())
+                        val stable = raw?.let { pitchStabilizer.push(it) }
+                        if (stable != null) {
+                            missedFrames = 0
+                            withContext(Dispatchers.Main) { pitch = stable }
+                        } else {
+                            missedFrames++
+                            if (missedFrames >= 5) withContext(Dispatchers.Main) { pitch = null }
+                        }
                     }
                 }
             } catch (_: SecurityException) {
@@ -200,15 +212,51 @@ private fun TunerPage(
         Spacer(Modifier.height(20.dp))
         Text("AFINACIÓN DE CUERDAS", modifier = Modifier.align(Alignment.Start), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f), fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        selected.strings.forEachIndexed { index, string ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("CUERDA ${string.number}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text(if (solfege) string.solfege else string.note, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("  %.2f Hz".format(string.frequency(a4)), color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f), fontSize = 12.sp)
-            }
+        selected.strings.forEach { string ->
+            FretboardStringLane(string, selected.strings, pitch, a4, tolerance, solfege)
         }
         Spacer(Modifier.height(10.dp))
         Text("La detección es cromática: también reconoce notas fuera de la afinación seleccionada.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+    }
+}
+
+@Composable
+private fun FretboardStringLane(
+    string: StringSpec, strings: List<StringSpec>, pitch: Pitch?, a4: Double, tolerance: Double, solfege: Boolean
+) {
+    val offsets = strings.map { spec ->
+        pitch?.let { 1200.0 * ln(it.frequency / spec.frequency(a4)) / ln(2.0) } ?: Double.POSITIVE_INFINITY
+    }
+    val bestIndex = offsets.indices.minByOrNull { abs(offsets[it]) } ?: -1
+    val index = strings.indexOf(string)
+    val active = pitch != null && bestIndex == index && abs(offsets[index]) < 600.0
+    val cents = if (active) offsets[index] else 0.0
+    val tuned = active && abs(cents) <= tolerance
+    val green = Color(0xFFB6F36A)
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.width(58.dp)) {
+            Text("CUERDA ${string.number}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f), fontSize = 9.sp)
+            Text(if (solfege) string.solfege else string.note, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                color = if (tuned) green else MaterialTheme.colorScheme.onSurface)
+        }
+        Canvas(Modifier.weight(1f).height(34.dp)) {
+            val mid = size.width / 2f
+            val y = size.height / 2f
+            val lineColor = if (tuned) green else Color(0xFF87918A)
+            drawLine(lineColor.copy(alpha = .7f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 2.dp.toPx())
+            drawLine(green.copy(alpha = .8f), androidx.compose.ui.geometry.Offset(mid, 2.dp.toPx()), androidx.compose.ui.geometry.Offset(mid, size.height - 2.dp.toPx()), 2.dp.toPx())
+            if (active) {
+                val x = mid + (cents.coerceIn(-50.0, 50.0).toFloat() / 50f) * (size.width * .43f)
+                drawCircle(if (tuned) green else Color(0xFFFFC857), radius = 7.dp.toPx(), center = androidx.compose.ui.geometry.Offset(x, y))
+            }
+        }
+        Text(if (active) "%+.0f¢".format(cents) else "%.0f Hz".format(string.frequency(a4)),
+            modifier = Modifier.width(58.dp), color = if (tuned) green else MaterialTheme.colorScheme.onSurface.copy(alpha = .65f),
+            fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.End)
     }
 }
 
