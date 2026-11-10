@@ -1,22 +1,29 @@
 # Guitar Pro Offline
 
-Afinador cromático para Android, diseñado para funcionar sin conexión.
+Afinador musical para Android con procesamiento local y funcionamiento sin conexión.
 
-## Funciones iniciales
-- Afinación cromática mediante micrófono y algoritmo YIN.
-- Instrumentos: guitarra, bajo, ukelele, violín y viola.
-- Presets de afinación para guitarra, bajo y ukelele.
-- Sin permisos de Internet, anuncios ni telemetría.
-- Android 6.0 (API 23) o superior.
+## Funciones
+- Afinador cromático con detección de tono YIN, visualización de cents y frecuencia.
+- Presets: guitarra (estándar, Drop D, Eb, D, DADGAD, Open G, Open D y 7 cuerdas), bajo de 4/5/6 cuerdas y Drop D, ukelele estándar/barítono, violín y viola.
+- Generador local de tonos de referencia.
+- Metrónomo audible de 40 a 240 BPM.
+- Calibración A4 de 410 a 480 Hz y tolerancia configurable.
+- Notación latina Do-Re-Mi o anglosajona.
+- Preferencias guardadas localmente.
+- Sin anuncios, rastreadores, cuentas ni permiso INTERNET.
+
+## Privacidad
+El permiso RECORD_AUDIO solo se utiliza mientras el afinador está activo. El audio se procesa en memoria y no se guarda ni se transmite.
 
 ## Compilar
-Requiere JDK 17, Android SDK API 35 y Gradle 8.9.
+Requisitos: JDK 17, Android SDK API 35 y Gradle 8.9.
 
 ```bash
+gradle testDebugUnitTest
 gradle assembleDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`
+El APK de depuración se genera en `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions ejecuta pruebas y publica el APK como artefacto en cada push a `main`.
 
-## Privacidad
-El audio se procesa localmente en el dispositivo. La aplicación no solicita permiso de Internet.
+## Licencia
+MIT. Consulta `LICENSE`.
