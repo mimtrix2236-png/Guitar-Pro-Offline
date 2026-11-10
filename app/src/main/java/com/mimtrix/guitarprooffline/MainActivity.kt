@@ -17,6 +17,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -161,10 +164,10 @@ private fun TunerPage(
     onTuning: (String) -> Unit, listening: Boolean, onListen: () -> Unit, pitch: Pitch?,
     a4: Double, tolerance: Double, solfege: Boolean
 ) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("AFINADOR CROMÁTICO", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f), fontSize = 12.sp, letterSpacing = 1.4.sp)
         Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("Guitarra", "Bajo", "Ukelele", "Violín", "Viola").forEach {
                 FilterChip(selected = instrument == it, onClick = { onInstrument(it) }, label = { Text(it, fontSize = 11.sp) })
             }
@@ -180,7 +183,7 @@ private fun TunerPage(
         Spacer(Modifier.height(24.dp))
         val cents = pitch?.cents ?: 0.0
         val inTune = pitch != null && abs(cents) <= tolerance
-        Text(pitch?.noteName ?: "—", fontSize = 64.sp, fontWeight = FontWeight.Bold, color = if (inTune) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        Text(pitch?.let { TunerEngine.noteForMidi(it.midi, solfege) } ?: "—", fontSize = 64.sp, fontWeight = FontWeight.Bold, color = if (inTune) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         Text(pitch?.let { "%.2f Hz".format(it.frequency) } ?: "Toca una cuerda", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f))
         Spacer(Modifier.height(18.dp))
         TuningMeter(cents.toFloat(), pitch != null, tolerance.toFloat())
@@ -234,6 +237,7 @@ private fun TuningMeter(cents: Float, active: Boolean, tolerance: Float) {
 
 @Composable
 private fun TonePage(notes: List<String>, selected: String, onSelect: (String) -> Unit, a4: Double) {
+    DisposableEffect(Unit) { onDispose { TonePlayer.stop() } }
     var playing by remember { mutableStateOf(false) }
     Column {
         Text("GENERADOR DE TONOS", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
