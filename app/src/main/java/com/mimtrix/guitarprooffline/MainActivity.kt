@@ -70,11 +70,11 @@ private fun GuitarProApp(activity: MainActivity, hasMicPermission: Boolean) {
     var pitch by remember { mutableStateOf<Pitch?>(null) }
     var bpm by remember { mutableFloatStateOf(100f) }
     var metronomeOn by remember { mutableStateOf(false) }
-    var selectedTone by remember { mutableStateOf("La4") }
+    var selectedTone by remember { mutableStateOf("A4") }
     val catalog = remember { TuningCatalog.all }
     val currentTunings = catalog.filter { it.instrument == instrument }
     val selectedTuning = currentTunings.firstOrNull { it.name == tuningName } ?: currentTunings.first()
-    val toneNames = listOf("Do3", "Re3", "Mi3", "Fa3", "Sol3", "La3", "Si3", "Do4", "Re4", "Mi4", "Fa4", "Sol4", "La4", "Si4", "Do5")
+    val toneNames = listOf("C3", "D3", "E3", "F3", "G3", "A3", "B3", "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5")
 
     LaunchedEffect(listening, hasMicPermission, a4) {
         if (!listening || !hasMicPermission) return@LaunchedEffect
