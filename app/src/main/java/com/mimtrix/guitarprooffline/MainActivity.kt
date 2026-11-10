@@ -82,7 +82,7 @@ private fun GuitarProApp(activity: MainActivity, hasMicPermission: Boolean) {
                 withContext(Dispatchers.Main) { listening = false }
                 return@withContext
             }
-            val recorder = AudioRecord(MediaRecorder.AudioSource.UNPROCESSED, rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBytes * 2, 8192))
+            val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBytes * 2, 8192))
             try {
                 recorder.startRecording()
                 val buffer = ShortArray(8192)
