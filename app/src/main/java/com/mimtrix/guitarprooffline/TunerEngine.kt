@@ -8,7 +8,7 @@ import kotlin.math.sqrt
 data class Pitch(val frequency: Double, val noteName: String, val cents: Double, val midi: Int, val clarity: Double)
 
 /** Median-based temporal filter: rejects transient octave jumps and smooths plucked-string decay. */
-class PitchStabilizer(private val windowSize: Int = 5, private val maxJumpCents: Double = 65.0) {
+class PitchStabilizer(private val windowSize: Int = 5, private val maxJumpCents: Double = 1000.0) {
     private val history = ArrayDeque<Double>()
     private var lastFrequency: Double? = null
 
